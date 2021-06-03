@@ -1,0 +1,5 @@
+<launch>
+    <node name="nmea_topic_driver" pkg="nmea_navsat_driver" type="nmea_topic_driver" output="screen" />
+
+    <node name="fusion_node" pkg="fusion" type="fusion_node" output="screen" />
+</launch>
