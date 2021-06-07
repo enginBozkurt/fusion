@@ -14,24 +14,50 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <Eigen/Core>
 #include <iostream>
+#include <fstream>
+#include <deque>
+
+#include "kalman_filter.h"
+
+using namespace lu;
 
 class FusionNode {
 public:
     FusionNode(ros::NodeHandle &nh);
 
-    ~FusionNode() {}
+    ~FusionNode();
 
     void ImuCallback(const sensor_msgs::ImuConstPtr &imu_msgs);
 
     void GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs);
 
+    bool InitRot(Eigen::Matrix3d &R);
+
+    void PublishState();
+
 private:
     ros::Subscriber imu_sub_;
     ros::Subscriber gps_sub_;
+
     ros::Publisher path_pub_;
     ros::Publisher odom_pub_;
 
     nav_msgs::Path nav_path_;
+
+    std::unique_ptr<KalmanFilter> kf_ptr_;
+
+    // init
+    bool initialized_ = false;
+    const int kImuBufSize = 100;
+    std::deque<ImuDataConstPtr> imu_buf_;
+    ImuDataConstPtr last_imu_ptr_;
+    Eigen::Vector3d init_lla_;
+    Eigen::Vector3d I_p_gps;
+
+    // log files
+    std::ofstream file_gps_;
+    std::ofstream file_state_;
+
 };
 
 #endif //FUSION_FUSION_NODE_H
