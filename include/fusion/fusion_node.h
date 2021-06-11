@@ -42,6 +42,9 @@ private:
     ros::Publisher path_pub_;
     ros::Publisher odom_pub_;
 
+    ros::Publisher debug_pub_acc_;
+    ros::Publisher debug_pub_gyr_;
+
     nav_msgs::Path nav_path_;
 
     std::unique_ptr<KalmanFilter> kf_ptr_;

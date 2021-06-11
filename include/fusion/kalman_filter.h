@@ -7,6 +7,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <se3.hpp>
 #include <memory>
 
 #include "utils.h"
@@ -27,6 +28,9 @@ namespace lu {
         Eigen::Vector3d p_;
         Eigen::Vector3d v_;
         Eigen::Matrix3d R_;
+        // Sophus::SO3f R_ = Sophus::SO3f();				 //rotation of imu
+
+        Eigen::Quaterniond q_;
 
         Eigen::Vector3d acc_bias_;
         Eigen::Vector3d gyr_bias_;
@@ -38,6 +42,7 @@ namespace lu {
             p_.setZero();
             v_.setZero();
             R_.setZero();
+            // R_.matrix().setZero();
             acc_bias_.setZero();
             gyr_bias_.setZero();
         }
@@ -49,7 +54,7 @@ namespace lu {
 
         ~KalmanFilter(){};
 
-        void Prediction(ImuDataConstPtr last_imu, ImuDataConstPtr curr_imu);
+        void Prediction(const ImuDataConstPtr& last_imu, const ImuDataConstPtr& curr_imu);
 
         void Correction(const Eigen::Matrix<double, 3, kStateDim> &H,
                         const Eigen::Matrix3d &V,

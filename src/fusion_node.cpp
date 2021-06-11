@@ -18,6 +18,10 @@ FusionNode::FusionNode(ros::NodeHandle &nh) {
     path_pub_ = nh.advertise<nav_msgs::Path>("nav_path", 10);
     odom_pub_ = nh.advertise<nav_msgs::Odometry>("nav_odom", 10);
 
+    // debug : display curve
+    debug_pub_acc_ = nh.advertise<geometry_msgs::Vector3>("acc", 10);
+    debug_pub_gyr_ = nh.advertise<geometry_msgs::Vector3>("gyr", 10);
+
     // log files
     file_gps_.open("fusion_gps.csv");
     file_state_.open("fusion_state.csv");
@@ -43,7 +47,6 @@ void FusionNode::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msgs) {
         imu_buf_.push_back(imu_data_ptr);
         if (imu_buf_.size() > kImuBufSize)
             imu_buf_.pop_front();
-
         return;
     }
 
@@ -58,10 +61,10 @@ void FusionNode::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msgs) {
 }
 
 void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
-    if (gps_msgs->status.status != 2) {
-        ROS_INFO("[%s] ERROR: Bad GPS Message!!!\n", __FUNCTION__);
-        return;
-    }
+//    if (gps_msgs->status.status != 2) {
+//        ROS_INFO("[%s] ERROR: Bad GPS Message!!!\n", __FUNCTION__);
+//        return;
+//    }
 
     // ROS_INFO("gps callback");
     GpsDataPtr gps_data_ptr = std::make_shared<GpsData>();
@@ -89,6 +92,9 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
 
         init_lla_ = gps_data_ptr->lla;
 
+        /// test
+        // kf_ptr_->state_ptr_->R_ = Eigen::Matrix3d::Identity();
+
         initialized_ = true;
 
         ROS_INFO("[%s] System initialized.\n", __FUNCTION__);
@@ -102,9 +108,16 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
     // residual
     const Eigen::Vector3d &p_GI = kf_ptr_->state_ptr_->p_;
     const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_;
-    Eigen::Vector3d residual = p_gps - (p_GI + R_GI * I_p_gps);     // todo I_p_gps update???
+
+    // gps - (imu + imu_to_gps)
+    Eigen::Vector3d residual = p_gps - (p_GI + R_GI * I_p_gps);     // GPS只观测位置信息p，需要转到同一坐标系下才能计算残差
+    // 此处将IMU下的p_GI通过坐标系变换，转到了GPS下进行
+    // p = p + dp
+    // R = R * dR
+    // R 残差如何计算？
 
     // jacobian
+    // residual的()内容 对位置求导，第一项位置为单位阵，第二项为速度偏导为零，第三项对R_GI * I_p_gps偏导为-R[x]x
     Eigen::Matrix<double, 3, kStateDim> H = Eigen::Matrix<double, 3, kStateDim>::Zero();
     H.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
     H.block<3,3>(0,6) = - R_GI * lu::skew_matrix(I_p_gps);  // ???
@@ -163,6 +176,26 @@ bool FusionNode::InitRot(Eigen::Matrix3d &R) {
 }
 
 void FusionNode::PublishState() {
+    // debug msgs
+//    ROS_INFO("acc: [%f, %f, %f], gyr: [%f, %f, %f]",
+//             kf_ptr_->state_ptr_->acc_bias_.x(),
+//             kf_ptr_->state_ptr_->acc_bias_.y(),
+//             kf_ptr_->state_ptr_->acc_bias_.z(),
+//             kf_ptr_->state_ptr_->gyr_bias_.x(),
+//             kf_ptr_->state_ptr_->gyr_bias_.y(),
+//             kf_ptr_->state_ptr_->gyr_bias_.z());
+
+    geometry_msgs::Vector3 debug_mgs;
+    debug_mgs.x = kf_ptr_->state_ptr_->acc_bias_.x();
+    debug_mgs.y = kf_ptr_->state_ptr_->acc_bias_.y();
+    debug_mgs.z = kf_ptr_->state_ptr_->acc_bias_.z();
+    debug_pub_acc_.publish(debug_mgs);
+
+    debug_mgs.x = kf_ptr_->state_ptr_->gyr_bias_.x();
+    debug_mgs.y = kf_ptr_->state_ptr_->gyr_bias_.y();
+    debug_mgs.z = kf_ptr_->state_ptr_->gyr_bias_.z();
+    debug_pub_gyr_.publish(debug_mgs);
+
     // publish the odometry
     std::string fixed_id = "world";
     nav_msgs::Odometry odom_msg;

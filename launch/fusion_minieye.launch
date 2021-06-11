@@ -1,0 +1,17 @@
+<launch>
+    <param name="acc_noise"       type="double" value="1e-2" />
+    <param name="gyr_noise"       type="double" value="1e-4" />
+    <param name="acc_bias_noise"  type="double" value="1e-6" />
+    <param name="gyr_bias_noise"  type="double" value="1e-8" />
+    <param name="play_rate"       type="double" value="2.0" />
+
+    <node name="fusion_node" pkg="fusion" type="fusion_node" output="screen" />
+
+    <node pkg="rviz" type="rviz" name="rviz" output="screen"
+          args="-d $(find fusion)/rviz/default.rviz" required="true">
+    </node>
+
+    <node name="image_node" pkg="fusion" type="image_node" output="screen" />
+    <node name="sensor_node" pkg="fusion" type="sensor_node" output="screen" />
+
+</launch>
