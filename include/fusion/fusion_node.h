@@ -31,7 +31,8 @@ public:
 
     void GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs);
 
-    bool InitRot(Eigen::Matrix3d &R);
+    // bool InitRot(Eigen::Matrix3d &R);
+    bool InitRot(Sophus::SO3d &R);
 
     void PublishState();
 

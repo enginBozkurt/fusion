@@ -27,8 +27,8 @@ namespace lu {
 
         Eigen::Vector3d p_;
         Eigen::Vector3d v_;
-        Eigen::Matrix3d R_;
-        // Sophus::SO3f R_ = Sophus::SO3f();				 //rotation of imu
+        // Eigen::Matrix3d R_;
+        Sophus::SO3d R_ = Sophus::SO3d();				 //rotation of imu
 
         Eigen::Quaterniond q_;
 
@@ -41,8 +41,8 @@ namespace lu {
             cov.setZero();
             p_.setZero();
             v_.setZero();
-            R_.setZero();
-            // R_.matrix().setZero();
+            // R_.setZero();
+            R_.matrix().setZero();
             acc_bias_.setZero();
             gyr_bias_.setZero();
         }

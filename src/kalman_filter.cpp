@@ -37,35 +37,19 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     // p v R
     const Eigen::Vector3d acc_unbias = 0.5 * (last_imu->acc + curr_imu->acc) - last_state.acc_bias_;
     const Eigen::Vector3d gyr_unbias = 0.5 * (last_imu->gyr + curr_imu->gyr) - last_state.gyr_bias_;
-    //    const Eigen::Vector3d acc_unbias = curr_imu->acc - last_state.acc_bias_;
-    //    const Eigen::Vector3d gyr_unbias = curr_imu->gyr - last_state.gyr_bias_;
     const Eigen::Vector3d acc_nominal = last_state.R_ * acc_unbias + Eigen::Vector3d(0, 0, -kG);
     state_ptr_->p_ = last_state.p_ + last_state.v_ * dt + 0.5 * acc_nominal * dt2;
     state_ptr_->v_ = last_state.v_ + acc_nominal * dt;
-
-    // rotation vector
-    const Eigen::Vector3d delta_angle_axis = gyr_unbias * dt;
-    Eigen::AngleAxisd rotation_vector = Eigen::AngleAxisd(delta_angle_axis.norm(), delta_angle_axis.normalized());
-
-#if 1
-    /// 使用李群 R 进行更新
-    Eigen::Matrix3d dR = rotation_vector.toRotationMatrix();
-    state_ptr_->R_ = last_state.R_ * dR;
-#else
-    /// 使用四元数 q 进行更新
-    Eigen::Quaterniond dq(rotation_vector);
-    state_ptr_->q_ = last_state.q_ * dq;
-    state_ptr_->R_ = state_ptr_->q_.toRotationMatrix();
-    Eigen::Matrix3d dR = rotation_vector.toRotationMatrix();
-#endif
+    state_ptr_->R_ = Sophus::SO3d::exp(-gyr_unbias * dt) * state_ptr_->R_;
 
     // the error-state jacobian and perturbation matrices
     // Fx
     MatrixSD Fx = MatrixSD::Identity();
     Fx.block<3,3>(0,3) = Eigen::Matrix3d::Identity() * dt;
-    Fx.block<3,3>(3,6) = - state_ptr_->R_ * lu::skew_matrix(acc_unbias) * dt;
-    Fx.block<3,3>(3,9) = - state_ptr_->R_ * dt;
-    Fx.block<3,3>(6,6) = dR.transpose();
+    Fx.block<3,3>(3,6) = - state_ptr_->R_.matrix() * lu::skew_matrix(acc_unbias) * dt;
+    Fx.block<3,3>(3,9) = - state_ptr_->R_.matrix() * dt;
+    // Fx.block<3,3>(6,6) = dR.transpose();
+    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
     Fx.block<3,3>(6,12) = - Eigen::Matrix3d::Identity() * dt;
 
     // Fi

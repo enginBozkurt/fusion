@@ -107,7 +107,8 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
 
     // residual
     const Eigen::Vector3d &p_GI = kf_ptr_->state_ptr_->p_;
-    const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_;
+    // const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_;
+    const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_.matrix();
 
     // gps - (imu + imu_to_gps)
     Eigen::Vector3d residual = p_gps - (p_GI + R_GI * I_p_gps);     // GPS只观测位置信息p，需要转到同一坐标系下才能计算残差
@@ -136,7 +137,8 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
 }
 
 
-bool FusionNode::InitRot(Eigen::Matrix3d &R) {
+//bool FusionNode::InitRot(Eigen::Matrix3d &R) {
+bool FusionNode::InitRot(Sophus::SO3d &R) {
     // mean and std of imu acc
     Eigen::Vector3d sum_acc(0., 0., 0.);
     for (const auto imu_data : imu_buf_)
@@ -171,7 +173,8 @@ bool FusionNode::InitRot(Eigen::Matrix3d &R) {
     r_IG.block<3, 1>(0, 1) = y_axis;
     r_IG.block<3, 1>(0, 2) = z_axis;
 
-    R = r_IG.transpose();
+    // R = r_IG.transpose();
+    R.matrix() = r_IG.transpose();
     return true;
 }
 
@@ -203,7 +206,8 @@ void FusionNode::PublishState() {
     odom_msg.header.stamp = ros::Time::now();
 
     Eigen::Isometry3d T_wb = Eigen::Isometry3d::Identity();
-    T_wb.linear() = kf_ptr_->state_ptr_->R_;
+    // T_wb.linear() = kf_ptr_->state_ptr_->R_;
+    T_wb.linear() = kf_ptr_->state_ptr_->R_.matrix();
     T_wb.translation() = kf_ptr_->state_ptr_->p_;
 
     tf::poseEigenToMsg(T_wb, odom_msg.pose.pose);
@@ -232,7 +236,8 @@ void FusionNode::PublishState() {
     std::shared_ptr<State> kf_state(kf_ptr_->state_ptr_);
     Eigen::Vector3d lla;
     lu::enu2lla(init_lla_, kf_state->p_, &lla);  // convert ENU state to lla
-    const Eigen::Quaterniond q_GI(kf_state->R_);
+    // const Eigen::Quaterniond q_GI(kf_state->R_);
+    const Eigen::Quaterniond q_GI(kf_state->R_.matrix());
     file_state_ << std::fixed << std::setprecision(15)
                 << kf_state->timestamp << ", "
                 << kf_state->p_[0] << ", " << kf_state->p_[1] << ", " << kf_state->p_[2] << ", "
