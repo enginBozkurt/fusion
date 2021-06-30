@@ -40,7 +40,7 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     const Eigen::Vector3d acc_nominal = last_state.R_ * acc_unbias + Eigen::Vector3d(0, 0, -kG);
     state_ptr_->p_ = last_state.p_ + last_state.v_ * dt + 0.5 * acc_nominal * dt2;
     state_ptr_->v_ = last_state.v_ + acc_nominal * dt;
-    state_ptr_->R_ = Sophus::SO3d::exp(-gyr_unbias * dt) * state_ptr_->R_;
+    state_ptr_->R_ = state_ptr_->R_ * Sophus::SO3d::exp(gyr_unbias * dt);
 
     // the error-state jacobian and perturbation matrices
     // Fx
@@ -49,7 +49,8 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     Fx.block<3,3>(3,6) = - state_ptr_->R_.matrix() * lu::skew_matrix(acc_unbias) * dt;
     Fx.block<3,3>(3,9) = - state_ptr_->R_.matrix() * dt;
     // Fx.block<3,3>(6,6) = dR.transpose();
-    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
+    //    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
+    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix();
     Fx.block<3,3>(6,12) = - Eigen::Matrix3d::Identity() * dt;
 
     // Fi
@@ -88,15 +89,9 @@ void KalmanFilter::Correction(const Eigen::Matrix<double, 3, kStateDim> &H, cons
     // update to nominal-state
     state_ptr_->p_ += delta_x.block<3,1>(0,0);
     state_ptr_->v_ += delta_x.block<3,1>(3,0);
-
-    const Eigen::Vector3d dR = delta_x.block<3,1>(6,0);
-    //    if (dR.norm() > __DBL_EPSILON__)
-    state_ptr_->R_ *= Eigen::AngleAxisd(dR.norm(), dR.normalized()).toRotationMatrix();
-
+    state_ptr_->R_ = state_ptr_->R_ * Sophus::SO3d::exp(delta_x.block<3,1>(6,0));
     state_ptr_->acc_bias_ += delta_x.block<3,1>(9,0);
     state_ptr_->gyr_bias_ += delta_x.block<3,1>(12,0);
 
-    /// step 3. reset of the error-state
-
-
+    // step 3. reset of the error-state
 }

@@ -50,6 +50,8 @@ private:
 
     std::unique_ptr<KalmanFilter> kf_ptr_;
 
+    Eigen::Matrix3d R_CI;
+
     // init
     bool initialized_ = false;
     const int kImuBufSize = 100;

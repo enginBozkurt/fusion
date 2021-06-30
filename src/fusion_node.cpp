@@ -22,6 +22,8 @@ FusionNode::FusionNode(ros::NodeHandle &nh) {
     debug_pub_acc_ = nh.advertise<geometry_msgs::Vector3>("acc", 10);
     debug_pub_gyr_ = nh.advertise<geometry_msgs::Vector3>("gyr", 10);
 
+    R_CI << 0, 1, 0, 0, 0, -1, -1, 0, 0;
+
     // log files
     file_gps_.open("fusion_gps.csv");
     file_state_.open("fusion_state.csv");
@@ -42,6 +44,9 @@ void FusionNode::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msgs) {
     imu_data_ptr->gyr[0] = imu_msgs->angular_velocity.x;
     imu_data_ptr->gyr[1] = imu_msgs->angular_velocity.y;
     imu_data_ptr->gyr[2] = imu_msgs->angular_velocity.z;
+
+    imu_data_ptr->acc = R_CI * imu_data_ptr->acc;
+    imu_data_ptr->gyr = R_CI * imu_data_ptr->gyr;
 
     if (!initialized_) {
         imu_buf_.push_back(imu_data_ptr);
