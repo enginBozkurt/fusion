@@ -12,10 +12,19 @@
 
 #include "utils.h"
 
+#define ODO
+
 namespace lu {
 
+#ifndef ODO
     constexpr int kStateDim = 15;
     constexpr int kNoiseDim = 12;
+
+#else
+    constexpr int kStateDim = 21;
+    constexpr int kNoiseDim = 18;
+#endif
+
     constexpr double kG = 9.81007;
 
     using MatrixSD = Eigen::Matrix<double, kStateDim, kStateDim>;
@@ -31,6 +40,9 @@ namespace lu {
         Eigen::Vector3d b_a;
         Eigen::Vector3d b_g;
 
+        Sophus::SO3d R_IV;
+        Eigen::Vector3d p_I_V;
+
         double timestamp;
 
         State() {
@@ -40,6 +52,9 @@ namespace lu {
             R_GI.matrix().setZero();
             b_a.setZero();
             b_g.setZero();
+
+            R_IV.matrix().setZero();
+            p_I_V.setZero();
         }
     };
 

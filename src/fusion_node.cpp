@@ -69,10 +69,10 @@ void FusionNode::ImuCallback(const sensor_msgs::ImuConstPtr &imu_msgs) {
 }
 
 void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
-//    if (gps_msgs->status.status != 2) {
-//        ROS_INFO("[%s] ERROR: Bad GPS Message!!!\n", __FUNCTION__);
-//        return;
-//    }
+    //    if (gps_msgs->status.status != 2) {
+    //        ROS_INFO("[%s] ERROR: Bad GPS Message!!!\n", __FUNCTION__);
+    //        return;
+    //    }
 
     // ROS_INFO("gps callback");
     GpsDataPtr gps_data_ptr = std::make_shared<GpsData>();

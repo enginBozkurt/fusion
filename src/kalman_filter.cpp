@@ -22,6 +22,29 @@ KalmanFilter::KalmanFilter(double acc_n, double gyr_n, double acc_w, double gyr_
     state_ptr_->cov(8, 8) = sigma_yaw * sigma_yaw;                                                 // yaw std: 100 degree
     state_ptr_->cov.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * 0.0004;               // Acc bias
     state_ptr_->cov.block<3, 3>(12, 12) = Eigen::Matrix3d::Identity() * 0.0004;             // Gyr bias
+
+    // p_I_V, R_IV 初始化
+    float pitch, yaw, roll;
+    pitch = 0.0;
+    yaw = 0.0;
+    roll = 0.0;
+    // pitch = -0.01;
+    // yaw = 0.02;
+    // roll = -0.014;
+
+    float cx, ch, cl;
+    cx = 0.0;
+    ch = -1.2;
+    cl = 1.90;
+
+
+    double v = 0;   // 初始化时的speed
+    state_ptr_->p_I_G.setZero();
+    state_ptr_->b_a.setZero();
+    state_ptr_->b_g.setZero();
+    state_ptr_->p_I_V = Eigen::Vector3d(cx, ch, cl);
+    state_ptr_->R_GI = Sophus::SO3d::exp(Eigen::Vector3d(-pitch, -yaw, -roll));
+    state_ptr_->v_I_G = state_ptr_->R_GI.inverse() * state_ptr_->R_IV * Eigen::Vector3d(0, 0, v);
 }
 
 void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataConstPtr& curr_imu) {
@@ -45,10 +68,10 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     // the error-state jacobian and perturbation matrices
     // Fx
     MatrixSD Fx = MatrixSD::Identity();
-    Fx.block<3,3>(0,3) = Eigen::Matrix3d::Identity() * dt;
-    Fx.block<3,3>(3,6) = - state_ptr_->R_GI.matrix() * lu::skew_matrix(acc_unbias) * dt;
+    Fx.block<3,3>(0,3) = Eigen::Matrix3d::Identity() * dt;                                  // p
+    Fx.block<3,3>(3,6) = - state_ptr_->R_GI.matrix() * lu::skew_matrix(acc_unbias) * dt;    // v
     Fx.block<3,3>(3,9) = - state_ptr_->R_GI.matrix() * dt;
-    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
+    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();           // R
     Fx.block<3,3>(6,12) = - Eigen::Matrix3d::Identity() * dt;
 
     // Fi
@@ -61,6 +84,10 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     Qi.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * gyr_noise_ * dt2;
     Qi.block<3,3>(6,6) = Eigen::Matrix3d::Identity() * acc_bias_noise_ * dt;
     Qi.block<3,3>(9,9) = Eigen::Matrix3d::Identity() * gyr_bias_noise_ * dt;
+#ifdef ODO
+    Qi.block<3,3>(12,12) = Eigen::Matrix3d::Identity() * 1e-6 * dt;
+    Qi.block<3,3>(15,15) = Eigen::Matrix3d::Identity() * 1e-6 * dt;
+#endif
 
     // update cov P
     state_ptr_->cov = Fx * last_state.cov * Fx.transpose() + Fi * Qi * Fi.transpose();
@@ -90,6 +117,10 @@ void KalmanFilter::Correction(const Eigen::Matrix<double, 3, kStateDim> &H, cons
     state_ptr_->R_GI = state_ptr_->R_GI * Sophus::SO3d::exp(delta_x.block<3,1>(6, 0));
     state_ptr_->b_a += delta_x.block<3,1>(9, 0);
     state_ptr_->b_g += delta_x.block<3,1>(12, 0);
+#ifdef ODO
+    state_ptr_->p_I_V += delta_x.block<3,1>(15, 0);
+    state_ptr_->R_IV = state_ptr_->R_IV * Sophus::SO3d::exp(delta_x.block<3,1>(18, 0));
+#endif
 
     // step 3. reset of the error-state
 }
