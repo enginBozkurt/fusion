@@ -11,6 +11,7 @@
 
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
+#include "fusion/single_val.h"
 
 #define ACCSCALE 1.0 / 4096.0
 #define GYRSCALE 2000.0 * M_PI / 180.0 / 32768.0
@@ -42,6 +43,8 @@ public:
 
     ros::Publisher imu_pub_;
     ros::Publisher gps_pub_;
+    ros::Publisher speed_pub_;
+    ros::Publisher yawrate_pub_;
 };
 
 //std::string topic_imu = "/imu/data";
@@ -50,6 +53,8 @@ public:
 SensorData::SensorData(ros::NodeHandle &nh) {
     imu_pub_ = nh.advertise<sensor_msgs::Imu>("/imu/data", 10);
     gps_pub_ = nh.advertise<sensor_msgs::NavSatFix>("/fix", 10);
+    speed_pub_ = nh.advertise<fusion::single_val>("/speed", 10);
+    yawrate_pub_ = nh.advertise<fusion::single_val>("/yawrate", 10);
 
     gps_.position_covariance = {0.81, 0.0, 0.0,
                                 0.0, 0.81, 0.0,
@@ -74,11 +79,17 @@ void SensorData::PublishGPS() {
 }
 
 void SensorData::PublishYawRate() {
-
+    fusion::single_val data;
+    data.header.stamp = time_;
+    data.val = yaw_rate_;
+    yawrate_pub_.publish(data);
 }
 
 void SensorData::PublishSpeed() {
-
+    fusion::single_val data;
+    data.header.stamp = time_;
+    data.val = speed_;
+    speed_pub_.publish(data);
 }
 
 int main(int argc, char** argv) {

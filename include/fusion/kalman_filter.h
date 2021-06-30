@@ -25,26 +25,21 @@ namespace lu {
 
         MatrixSD cov;
 
-        Eigen::Vector3d p_;
-        Eigen::Vector3d v_;
-        // Eigen::Matrix3d R_;
-        Sophus::SO3d R_ = Sophus::SO3d();				 //rotation of imu
-
-        Eigen::Quaterniond q_;
-
-        Eigen::Vector3d acc_bias_;
-        Eigen::Vector3d gyr_bias_;
+        Eigen::Vector3d p_I_G;
+        Eigen::Vector3d v_I_G;
+        Sophus::SO3d R_GI;				 //rotation of imu
+        Eigen::Vector3d b_a;
+        Eigen::Vector3d b_g;
 
         double timestamp;
 
         State() {
             cov.setZero();
-            p_.setZero();
-            v_.setZero();
-            // R_.setZero();
-            R_.matrix().setZero();
-            acc_bias_.setZero();
-            gyr_bias_.setZero();
+            p_I_G.setZero();
+            v_I_G.setZero();
+            R_GI.matrix().setZero();
+            b_a.setZero();
+            b_g.setZero();
         }
     };
 

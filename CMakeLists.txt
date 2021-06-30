@@ -12,7 +12,19 @@ find_package(catkin REQUIRED COMPONENTS
 		eigen_conversions
 		cv_bridge
 		image_transport
+		message_generation
 		)
+
+add_message_files(
+		FILES
+		single_val.msg
+)
+
+## Generate added messages and services with any dependencies listed here
+generate_messages(
+		DEPENDENCIES
+		std_msgs  # Or other packages containing msgs
+)
 
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules )
 find_package(Eigen3 REQUIRED)
@@ -25,7 +37,7 @@ find_package(OpenCV 3.3 REQUIRED)
 catkin_package(
 		#  INCLUDE_DIRS include
 		#  LIBRARIES fusion
-		#  CATKIN_DEPENDS roscpp rospy std_msgs
+		CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
 		#  DEPENDS system_lib
 )
 

@@ -11,22 +11,38 @@
 namespace lu {
 
     struct ImuData {
-        double timestamp;
+        double timestamp = - 1.0;
 
-        Eigen::Vector3d acc;
-        Eigen::Vector3d gyr;
+        Eigen::Vector3d acc = Eigen::Vector3d::Zero();
+        Eigen::Vector3d gyr = Eigen::Vector3d::Zero();
     };
     using ImuDataPtr = std::shared_ptr<ImuData>;
     using ImuDataConstPtr = std::shared_ptr<const ImuData>;
 
-    struct GpsData {
-        double timestamp;
+    struct SpeedData {
+        double timestamp = -1.0;
+        double v = - 1.0;
+    };
+    using SpeedDataPtr = std::shared_ptr<SpeedData>;
+    using SpeedDataConstPtr = std::shared_ptr<const SpeedData>;
 
-        Eigen::Vector3d lla;  // Latitude in degree, longitude in degree, and altitude in meter
-        Eigen::Matrix3d cov;  // Covariance in m^2
+    struct YRData {
+        double timestamp = - 1.0;
+        double yr = -1.0;
+    };
+    using YRDataPtr = std::shared_ptr<YRData>;
+    using YRDataConstPtr = std::shared_ptr<const YRData>;
+
+    struct GpsData {
+        double timestamp = - 1.0;
+
+        Eigen::Vector3d lla = Eigen::Vector3d::Zero();  // Latitude in degree, longitude in degree, and altitude in meter
+        Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();  // Covariance in m^2
     };
     using GpsDataPtr = std::shared_ptr<GpsData>;
     using GpsDataConstPtr = std::shared_ptr<const GpsData>;
+
+
 
     inline Eigen::Matrix3d skew_matrix(const Eigen::Vector3d &v) {
         Eigen::Matrix3d w;

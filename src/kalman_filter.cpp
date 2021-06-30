@@ -35,22 +35,20 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     state_ptr_->timestamp = curr_imu->timestamp;
     // the nominal-state kinematics
     // p v R
-    const Eigen::Vector3d acc_unbias = 0.5 * (last_imu->acc + curr_imu->acc) - last_state.acc_bias_;
-    const Eigen::Vector3d gyr_unbias = 0.5 * (last_imu->gyr + curr_imu->gyr) - last_state.gyr_bias_;
-    const Eigen::Vector3d acc_nominal = last_state.R_ * acc_unbias + Eigen::Vector3d(0, 0, -kG);
-    state_ptr_->p_ = last_state.p_ + last_state.v_ * dt + 0.5 * acc_nominal * dt2;
-    state_ptr_->v_ = last_state.v_ + acc_nominal * dt;
-    state_ptr_->R_ = state_ptr_->R_ * Sophus::SO3d::exp(gyr_unbias * dt);
+    const Eigen::Vector3d acc_unbias = 0.5 * (last_imu->acc + curr_imu->acc) - last_state.b_a;
+    const Eigen::Vector3d gyr_unbias = 0.5 * (last_imu->gyr + curr_imu->gyr) - last_state.b_g;
+    const Eigen::Vector3d acc_nominal = last_state.R_GI * acc_unbias + Eigen::Vector3d(0, 0, -kG);
+    state_ptr_->p_I_G = last_state.p_I_G + last_state.v_I_G * dt + 0.5 * acc_nominal * dt2;
+    state_ptr_->v_I_G = last_state.v_I_G + acc_nominal * dt;
+    state_ptr_->R_GI = state_ptr_->R_GI * Sophus::SO3d::exp(gyr_unbias * dt);
 
     // the error-state jacobian and perturbation matrices
     // Fx
     MatrixSD Fx = MatrixSD::Identity();
     Fx.block<3,3>(0,3) = Eigen::Matrix3d::Identity() * dt;
-    Fx.block<3,3>(3,6) = - state_ptr_->R_.matrix() * lu::skew_matrix(acc_unbias) * dt;
-    Fx.block<3,3>(3,9) = - state_ptr_->R_.matrix() * dt;
-    // Fx.block<3,3>(6,6) = dR.transpose();
-    //    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
-    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix();
+    Fx.block<3,3>(3,6) = - state_ptr_->R_GI.matrix() * lu::skew_matrix(acc_unbias) * dt;
+    Fx.block<3,3>(3,9) = - state_ptr_->R_GI.matrix() * dt;
+    Fx.block<3,3>(6,6) = Sophus::SO3d::exp(gyr_unbias * dt).matrix().transpose();
     Fx.block<3,3>(6,12) = - Eigen::Matrix3d::Identity() * dt;
 
     // Fi
@@ -81,17 +79,17 @@ void KalmanFilter::Correction(const Eigen::Matrix<double, 3, kStateDim> &H, cons
 
     // update cov
     // to do : cov update function
-    state_ptr_->cov = (MatrixSD::Identity() - K * H) * P;
-    //    const MatrixSD I_KH = MatrixSD::Identity() - K * H;
-    //    state_ptr_->cov = I_KH * P * I_KH.transpose() + K * V * K.transpose();
+    // state_ptr_->cov = (MatrixSD::Identity() - K * H) * P;
+    const MatrixSD I_KH = MatrixSD::Identity() - K * H;
+    state_ptr_->cov = I_KH * P * I_KH.transpose() + K * V * K.transpose();
 
     /// step 2. injection of the observed errors into the nominal-state
     // update to nominal-state
-    state_ptr_->p_ += delta_x.block<3,1>(0,0);
-    state_ptr_->v_ += delta_x.block<3,1>(3,0);
-    state_ptr_->R_ = state_ptr_->R_ * Sophus::SO3d::exp(delta_x.block<3,1>(6,0));
-    state_ptr_->acc_bias_ += delta_x.block<3,1>(9,0);
-    state_ptr_->gyr_bias_ += delta_x.block<3,1>(12,0);
+    state_ptr_->p_I_G += delta_x.block<3,1>(0, 0);
+    state_ptr_->v_I_G += delta_x.block<3,1>(3, 0);
+    state_ptr_->R_GI = state_ptr_->R_GI * Sophus::SO3d::exp(delta_x.block<3,1>(6, 0));
+    state_ptr_->b_a += delta_x.block<3,1>(9, 0);
+    state_ptr_->b_g += delta_x.block<3,1>(12, 0);
 
     // step 3. reset of the error-state
 }

@@ -14,6 +14,9 @@ FusionNode::FusionNode(ros::NodeHandle &nh) {
     std::string topic_gps = "/fix";
     imu_sub_ = nh.subscribe(topic_imu, 10, &FusionNode::ImuCallback, this);
     gps_sub_ = nh.subscribe(topic_gps, 10, &FusionNode::GpsCallback, this);
+    speed_sub_ = nh.subscribe("/speed", 10, &FusionNode::SpeedCallback, this);
+    yawrate_sub_ = nh.subscribe("/yawrate", 10, &FusionNode::YawRateCallback, this);
+
 
     path_pub_ = nh.advertise<nav_msgs::Path>("nav_path", 10);
     odom_pub_ = nh.advertise<nav_msgs::Odometry>("nav_odom", 10);
@@ -92,13 +95,13 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
         }
 
         kf_ptr_->state_ptr_->timestamp = last_imu_ptr_->timestamp;
-        if (!InitRot(kf_ptr_->state_ptr_->R_))
+        if (!InitRot(kf_ptr_->state_ptr_->R_GI))
             return;
 
         init_lla_ = gps_data_ptr->lla;
 
         /// test
-        // kf_ptr_->state_ptr_->R_ = Eigen::Matrix3d::Identity();
+        // kf_ptr_->state_ptr_->R_GI = Eigen::Matrix3d::Identity();
 
         initialized_ = true;
 
@@ -111,9 +114,9 @@ void FusionNode::GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs) {
     lu::lla2enu(init_lla_, gps_data_ptr->lla, &p_gps);
 
     // residual
-    const Eigen::Vector3d &p_GI = kf_ptr_->state_ptr_->p_;
-    // const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_;
-    const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_.matrix();
+    const Eigen::Vector3d &p_GI = kf_ptr_->state_ptr_->p_I_G;
+    // const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_GI;
+    const Eigen::Matrix3d &R_GI = kf_ptr_->state_ptr_->R_GI.matrix();
 
     // gps - (imu + imu_to_gps)
     Eigen::Vector3d residual = p_gps - (p_GI + R_GI * I_p_gps);     // GPS只观测位置信息p，需要转到同一坐标系下才能计算残差
@@ -186,22 +189,22 @@ bool FusionNode::InitRot(Sophus::SO3d &R) {
 void FusionNode::PublishState() {
     // debug msgs
 //    ROS_INFO("acc: [%f, %f, %f], gyr: [%f, %f, %f]",
-//             kf_ptr_->state_ptr_->acc_bias_.x(),
-//             kf_ptr_->state_ptr_->acc_bias_.y(),
-//             kf_ptr_->state_ptr_->acc_bias_.z(),
-//             kf_ptr_->state_ptr_->gyr_bias_.x(),
-//             kf_ptr_->state_ptr_->gyr_bias_.y(),
-//             kf_ptr_->state_ptr_->gyr_bias_.z());
+//             kf_ptr_->state_ptr_->b_a.x(),
+//             kf_ptr_->state_ptr_->b_a.y(),
+//             kf_ptr_->state_ptr_->b_a.z(),
+//             kf_ptr_->state_ptr_->b_g.x(),
+//             kf_ptr_->state_ptr_->b_g.y(),
+//             kf_ptr_->state_ptr_->b_g.z());
 
     geometry_msgs::Vector3 debug_mgs;
-    debug_mgs.x = kf_ptr_->state_ptr_->acc_bias_.x();
-    debug_mgs.y = kf_ptr_->state_ptr_->acc_bias_.y();
-    debug_mgs.z = kf_ptr_->state_ptr_->acc_bias_.z();
+    debug_mgs.x = kf_ptr_->state_ptr_->b_a.x();
+    debug_mgs.y = kf_ptr_->state_ptr_->b_a.y();
+    debug_mgs.z = kf_ptr_->state_ptr_->b_a.z();
     debug_pub_acc_.publish(debug_mgs);
 
-    debug_mgs.x = kf_ptr_->state_ptr_->gyr_bias_.x();
-    debug_mgs.y = kf_ptr_->state_ptr_->gyr_bias_.y();
-    debug_mgs.z = kf_ptr_->state_ptr_->gyr_bias_.z();
+    debug_mgs.x = kf_ptr_->state_ptr_->b_g.x();
+    debug_mgs.y = kf_ptr_->state_ptr_->b_g.y();
+    debug_mgs.z = kf_ptr_->state_ptr_->b_g.z();
     debug_pub_gyr_.publish(debug_mgs);
 
     // publish the odometry
@@ -211,12 +214,12 @@ void FusionNode::PublishState() {
     odom_msg.header.stamp = ros::Time::now();
 
     Eigen::Isometry3d T_wb = Eigen::Isometry3d::Identity();
-    // T_wb.linear() = kf_ptr_->state_ptr_->R_;
-    T_wb.linear() = kf_ptr_->state_ptr_->R_.matrix();
-    T_wb.translation() = kf_ptr_->state_ptr_->p_;
+    // T_wb.linear() = kf_ptr_->state_ptr_->R_GI;
+    T_wb.linear() = kf_ptr_->state_ptr_->R_GI.matrix();
+    T_wb.translation() = kf_ptr_->state_ptr_->p_I_G;
 
     tf::poseEigenToMsg(T_wb, odom_msg.pose.pose);
-    tf::vectorEigenToMsg(kf_ptr_->state_ptr_->v_, odom_msg.twist.twist.linear);
+    tf::vectorEigenToMsg(kf_ptr_->state_ptr_->v_I_G, odom_msg.twist.twist.linear);
 
     Eigen::Matrix3d P_pp = kf_ptr_->state_ptr_->cov.block<3,3>(0,0);
     Eigen::Matrix3d P_po = kf_ptr_->state_ptr_->cov.block<3,3>(0,6);
@@ -240,13 +243,31 @@ void FusionNode::PublishState() {
     // save state p q lla
     std::shared_ptr<State> kf_state(kf_ptr_->state_ptr_);
     Eigen::Vector3d lla;
-    lu::enu2lla(init_lla_, kf_state->p_, &lla);  // convert ENU state to lla
-    // const Eigen::Quaterniond q_GI(kf_state->R_);
-    const Eigen::Quaterniond q_GI(kf_state->R_.matrix());
+    lu::enu2lla(init_lla_, kf_state->p_I_G, &lla);  // convert ENU state to lla
+    // const Eigen::Quaterniond q_GI(kf_state->R_GI);
+    const Eigen::Quaterniond q_GI(kf_state->R_GI.matrix());
     file_state_ << std::fixed << std::setprecision(15)
                 << kf_state->timestamp << ", "
-                << kf_state->p_[0] << ", " << kf_state->p_[1] << ", " << kf_state->p_[2] << ", "
+                << kf_state->p_I_G[0] << ", " << kf_state->p_I_G[1] << ", " << kf_state->p_I_G[2] << ", "
                 << q_GI.x() << ", " << q_GI.y() << ", " << q_GI.z() << ", " << q_GI.w() << ", "
                 << lla[0] << ", " << lla[1] << ", " << lla[2]
                 << std::endl;
+}
+
+void FusionNode::SpeedCallback(const fusion::single_valConstPtr &msgs) {
+    // ROS_INFO("speed callback");
+    SpeedDataPtr speed_data_ptr = std::make_shared<SpeedData>();
+    speed_data_ptr->timestamp = msgs->header.stamp.toSec();
+    speed_data_ptr->v = msgs->val;
+
+    // filter_ptr_->insertSPD(speed_data_ptr);
+}
+
+void FusionNode::YawRateCallback(const fusion::single_valConstPtr &msgs) {
+    // ROS_INFO("yaw rate callback");
+    YRDataPtr yawrate_data_ptr = std::make_shared<YRData>();
+    yawrate_data_ptr->timestamp = msgs->header.stamp.toSec();
+    yawrate_data_ptr->yr = msgs->val;
+
+    // filter_ptr_->insertYR(yawrate_data_ptr);
 }

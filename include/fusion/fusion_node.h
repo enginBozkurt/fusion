@@ -18,6 +18,7 @@
 #include <deque>
 
 #include "kalman_filter.h"
+#include "fusion/single_val.h"
 
 using namespace lu;
 
@@ -31,7 +32,10 @@ public:
 
     void GpsCallback(const sensor_msgs::NavSatFixConstPtr &gps_msgs);
 
-    // bool InitRot(Eigen::Matrix3d &R);
+    void SpeedCallback(const fusion::single_valConstPtr &msgs);
+
+    void YawRateCallback(const fusion::single_valConstPtr &msgs);
+
     bool InitRot(Sophus::SO3d &R);
 
     void PublishState();
@@ -39,6 +43,8 @@ public:
 private:
     ros::Subscriber imu_sub_;
     ros::Subscriber gps_sub_;
+    ros::Subscriber speed_sub_;
+    ros::Subscriber yawrate_sub_;
 
     ros::Publisher path_pub_;
     ros::Publisher odom_pub_;
