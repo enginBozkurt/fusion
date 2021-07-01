@@ -66,9 +66,12 @@ namespace lu {
 
         void Prediction(const ImuDataConstPtr& last_imu, const ImuDataConstPtr& curr_imu);
 
-        void Correction(const Eigen::Matrix<double, 3, kStateDim> &H,
-                        const Eigen::Matrix3d &V,
-                        const Eigen::Vector3d &residual);
+        void Correction(const Eigen::MatrixXd &H,
+                        const Eigen::MatrixXd &V,
+                        const Eigen::VectorXd &residual);
+
+//        void Filter::measurementUpdate(const Eigen::VectorXf &r, Eigen::MatrixXf &H,
+//                                       const Eigen::MatrixXf &R, const std::string &fun_name)
 
         std::shared_ptr<State> state_ptr_;
 

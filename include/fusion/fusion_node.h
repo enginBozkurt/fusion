@@ -62,6 +62,7 @@ private:
     bool initialized_ = false;
     const int kImuBufSize = 100;
     std::deque<ImuDataConstPtr> imu_buf_;
+    ImuDataPtr curr_imu_ptr_;
     ImuDataConstPtr last_imu_ptr_;
     Eigen::Vector3d init_lla_;
     Eigen::Vector3d I_p_gps;

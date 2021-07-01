@@ -93,24 +93,28 @@ void KalmanFilter::Prediction(const ImuDataConstPtr& last_imu, const ImuDataCons
     state_ptr_->cov = Fx * last_state.cov * Fx.transpose() + Fi * Qi * Fi.transpose();
 }
 
-void KalmanFilter::Correction(const Eigen::Matrix<double, 3, kStateDim> &H, const Eigen::Matrix3d &V,
-                              const Eigen::Vector3d &residual) {
+//void KalmanFilter::Correction(const Eigen::Matrix<double, 3, kStateDim> &H, const Eigen::Matrix3d &V,
+//                              const Eigen::Vector3d &residual) {
+void KalmanFilter::Correction(const Eigen::MatrixXd &H, const Eigen::MatrixXd &V,
+                              const Eigen::VectorXd &residual) {
     /// step 1. observation of the error-state via filter correction
     // compute K
     const MatrixSD &P = state_ptr_->cov;
-    const Eigen::Matrix3d S = H * P * H.transpose() + V;
-    const Eigen::Matrix<double, kStateDim, 3> K = P * H.transpose() * S.inverse();
+    const Eigen::MatrixXd S = H * P * H.transpose() + V;
+    const Eigen::MatrixXd K = P * H.transpose() * S.inverse();
 
     // compute delta_x
-    const Eigen::Matrix<double, kStateDim, 1> delta_x = K * residual;
+    const Eigen::MatrixXd delta_x = K * residual;
 
     // update cov
     // to do : cov update function
     // state_ptr_->cov = (MatrixSD::Identity() - K * H) * P;
-    const MatrixSD I_KH = MatrixSD::Identity() - K * H;
+    const Eigen::MatrixXd I_KH = Eigen::MatrixXd::Identity(kStateDim, kStateDim) - K * H;
     state_ptr_->cov = I_KH * P * I_KH.transpose() + K * V * K.transpose();
 
     /// step 2. injection of the observed errors into the nominal-state
+    // std::cout << "size of delta : " << delta_x.size() << std::endl;
+
     // update to nominal-state
     state_ptr_->p_I_G += delta_x.block<3,1>(0, 0);
     state_ptr_->v_I_G += delta_x.block<3,1>(3, 0);
